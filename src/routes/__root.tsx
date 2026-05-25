@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-router";
 
 import appCss from "../styles.css?url";
+import { CustomCursor } from "@/components/CustomCursor";
 
 function NotFoundComponent() {
   return (
@@ -72,11 +73,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "Samu Game Hub" },
+      { name: "description", content: "Play HTML5 and web games on Samu Game Hub." },
+      { name: "author", content: "Samu" },
+      { property: "og:title", content: "Samu Game Hub" },
+      { property: "og:description", content: "Play HTML5 and web games on Samu Game Hub." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
@@ -113,6 +114,7 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <CustomCursor />
       <Outlet />
     </QueryClientProvider>
   );
