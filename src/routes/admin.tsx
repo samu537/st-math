@@ -78,8 +78,8 @@ function AdminPanel() {
   const [type, setType] = useState<"url" | "html">("url");
   const [content, setContent] = useState("");
 
-  const refresh = () => setGames(loadGames());
-  useEffect(refresh, []);
+  const refresh = () => { loadGames().then(setGames); };
+  useEffect(() => { refresh(); }, []);
 
   const handleImageFile = (file: File) => {
     const reader = new FileReader();
@@ -87,16 +87,16 @@ function AdminPanel() {
     reader.readAsDataURL(file);
   };
 
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !content.trim()) return;
-    addGame({ title: title.trim(), description: description.trim(), image: image.trim(), type, content: content.trim() });
+    await addGame({ title: title.trim(), description: description.trim(), image: image.trim(), type, content: content.trim() });
     setTitle(""); setDescription(""); setImage(""); setContent("");
     refresh();
   };
 
-  const remove = (id: string) => {
-    if (confirm("Delete this game?")) { deleteGame(id); refresh(); }
+  const remove = async (id: string) => {
+    if (confirm("Delete this game?")) { await deleteGame(id); refresh(); }
   };
 
   return (
