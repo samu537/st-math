@@ -5,7 +5,6 @@ import { SiteHeader } from "@/components/SiteHeader";
 import type { Game } from "@/lib/games-store";
 import { createAdminGame, deleteAdminGame, listAdminGames, setAdminGamePublished } from "@/lib/games.functions";
 
-const PASSWORD = "samy0713";
 const AUTH_KEY = "samu_admin_ok";
 const PASSWORD_KEY = "samu_admin_password";
 
@@ -17,6 +16,7 @@ export const Route = createFileRoute("/admin")({
 });
 
 function AdminPage() {
+  const loginFn = useServerFn(listAdminGames);
   const [authed, setAuthed] = useState(false);
   const [pwd, setPwd] = useState("");
   const [err, setErr] = useState("");
@@ -25,13 +25,14 @@ function AdminPage() {
     if (sessionStorage.getItem(AUTH_KEY) === "1" && sessionStorage.getItem(PASSWORD_KEY)) setAuthed(true);
   }, []);
 
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (pwd === PASSWORD) {
+    try {
+      await loginFn({ data: { password: pwd } });
       sessionStorage.setItem(AUTH_KEY, "1");
       sessionStorage.setItem(PASSWORD_KEY, pwd);
       setAuthed(true);
-    } else {
+    } catch {
       setErr("Incorrect password.");
       setPwd("");
     }
