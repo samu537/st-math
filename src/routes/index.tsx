@@ -15,7 +15,7 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const [games, setGames] = useState<Game[]>([]);
-  useEffect(() => setGames(loadGames()), []);
+  useEffect(() => { loadGames().then(setGames); }, []);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -50,15 +50,15 @@ function Index() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mx-auto flex max-w-3xl flex-col gap-5">
             {games.map((g) => (
               <Link
                 key={g.id}
                 to="/play/$gameId"
                 params={{ gameId: g.id }}
-                className="group relative overflow-hidden rounded-2xl border border-border bg-card transition hover:border-primary hover:shadow-[0_0_40px_-10px_var(--color-primary)]"
+                className="group flex flex-col gap-4 overflow-hidden rounded-2xl border border-border bg-card p-4 transition hover:border-primary hover:shadow-[0_0_40px_-10px_var(--color-primary)] sm:flex-row sm:items-center"
               >
-                <div className="aspect-video overflow-hidden bg-secondary">
+                <div className="aspect-video w-full shrink-0 overflow-hidden rounded-lg bg-secondary sm:h-32 sm:w-56">
                   {g.image ? (
                     <img
                       src={g.image}
@@ -71,12 +71,12 @@ function Index() {
                     </div>
                   )}
                 </div>
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background via-background/90 to-transparent p-5 pt-16">
+                <div className="min-w-0 flex-1">
                   <h3 className="text-xl font-bold">{g.title}</h3>
                   {g.description && (
                     <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{g.description}</p>
                   )}
-                  <div className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-primary opacity-0 transition group-hover:opacity-100">
+                  <div className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-primary transition group-hover:translate-x-1">
                     Play now →
                   </div>
                 </div>
