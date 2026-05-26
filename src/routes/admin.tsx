@@ -22,7 +22,7 @@ function AdminPage() {
   const [err, setErr] = useState("");
 
   useEffect(() => {
-    if (sessionStorage.getItem(AUTH_KEY) === "1") setAuthed(true);
+    if (sessionStorage.getItem(AUTH_KEY) === "1" && sessionStorage.getItem(PASSWORD_KEY)) setAuthed(true);
   }, []);
 
   const submit = (e: FormEvent) => {
