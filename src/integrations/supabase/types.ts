@@ -14,7 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      games: {
+        Row: {
+          content: string
+          created_at: string
+          description: string
+          id: string
+          image: string
+          title: string
+          type: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          description?: string
+          id?: string
+          image?: string
+          title: string
+          type: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          description?: string
+          id?: string
+          image?: string
+          title?: string
+          type?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
