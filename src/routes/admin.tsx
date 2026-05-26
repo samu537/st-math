@@ -1,10 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState, type FormEvent } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
-import { addGame, deleteGame, loadGames, type Game } from "@/lib/games-store";
+import type { Game } from "@/lib/games-store";
+import { createAdminGame, deleteAdminGame, listAdminGames, setAdminGamePublished } from "@/lib/games.functions";
 
 const PASSWORD = "samy0713";
 const AUTH_KEY = "samu_admin_ok";
+const PASSWORD_KEY = "samu_admin_password";
 
 export const Route = createFileRoute("/admin")({
   component: AdminPage,
@@ -26,6 +29,7 @@ function AdminPage() {
     e.preventDefault();
     if (pwd === PASSWORD) {
       sessionStorage.setItem(AUTH_KEY, "1");
+      sessionStorage.setItem(PASSWORD_KEY, pwd);
       setAuthed(true);
     } else {
       setErr("Incorrect password.");
@@ -71,14 +75,25 @@ function AdminPage() {
 }
 
 function AdminPanel() {
+  const listGamesFn = useServerFn(listAdminGames);
+  const createGameFn = useServerFn(createAdminGame);
+  const deleteGameFn = useServerFn(deleteAdminGame);
+  const setPublishedFn = useServerFn(setAdminGamePublished);
   const [games, setGames] = useState<Game[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [image, setImage] = useState("");
   const [type, setType] = useState<"url" | "html">("url");
   const [content, setContent] = useState("");
+  const [publishNow, setPublishNow] = useState(false);
+  const [message, setMessage] = useState("");
 
-  const refresh = () => { loadGames().then(setGames); };
+  const adminPassword = () => sessionStorage.getItem(PASSWORD_KEY) ?? "";
+  const refresh = () => {
+    listGamesFn({ data: { password: adminPassword() } })
+      .then(setGames)
+      .catch((error) => setMessage(error instanceof Error ? error.message : "Could not load games."));
+  };
   useEffect(() => { refresh(); }, []);
 
   const handleImageFile = (file: File) => {
@@ -90,13 +105,20 @@ function AdminPanel() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !content.trim()) return;
-    await addGame({ title: title.trim(), description: description.trim(), image: image.trim(), type, content: content.trim() });
-    setTitle(""); setDescription(""); setImage(""); setContent("");
+    await createGameFn({ data: { password: adminPassword(), title: title.trim(), description: description.trim(), image: image.trim(), type, content: content.trim(), published: publishNow } });
+    setTitle(""); setDescription(""); setImage(""); setContent(""); setPublishNow(false);
+    setMessage(publishNow ? "Game saved and published for players." : "Game saved as a draft.");
     refresh();
   };
 
   const remove = async (id: string) => {
-    if (confirm("Delete this game?")) { await deleteGame(id); refresh(); }
+    if (confirm("Delete this game?")) { await deleteGameFn({ data: { password: adminPassword(), id } }); refresh(); }
+  };
+
+  const togglePublished = async (game: Game) => {
+    await setPublishedFn({ data: { password: adminPassword(), id: game.id, published: !game.published } });
+    setMessage(!game.published ? "Game published for players." : "Game moved back to draft.");
+    refresh();
   };
 
   return (
@@ -109,7 +131,7 @@ function AdminPanel() {
             <p className="mt-1 text-muted-foreground">Add, manage, and remove games.</p>
           </div>
           <button
-            onClick={() => { sessionStorage.removeItem(AUTH_KEY); location.reload(); }}
+            onClick={() => { sessionStorage.removeItem(AUTH_KEY); sessionStorage.removeItem(PASSWORD_KEY); location.reload(); }}
             className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground hover:border-primary hover:text-primary"
           >
             Sign out
@@ -161,9 +183,15 @@ function AdminPanel() {
               )}
             </Field>
 
+            <label className="flex items-center gap-3 rounded-md border border-border bg-input px-3 py-2 text-sm font-semibold text-muted-foreground">
+              <input type="checkbox" checked={publishNow} onChange={(e) => setPublishNow(e.target.checked)} className="h-4 w-4 accent-primary" />
+              Publish for players right away
+            </label>
+
             <button type="submit" className="w-full rounded-md bg-gradient-to-br from-primary to-ember px-4 py-3 font-bold text-primary-foreground shadow-[0_0_24px_-4px_var(--color-primary)] transition hover:brightness-110">
-              + Add game
+              + Save game
             </button>
+            {message && <p className="text-sm font-semibold text-primary">{message}</p>}
           </form>
 
           <div className="space-y-3">
@@ -175,9 +203,17 @@ function AdminPanel() {
                   {g.image && <img src={g.image} alt={g.title} className="h-full w-full object-cover" />}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate font-bold">{g.title}</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="truncate font-bold">{g.title}</div>
+                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${g.published ? "border-primary/50 bg-primary/10 text-primary" : "border-border bg-input text-muted-foreground"}`}>
+                      {g.published ? "Published" : "Draft"}
+                    </span>
+                  </div>
                   <div className="truncate text-xs text-muted-foreground">{g.type.toUpperCase()} · {g.content.slice(0, 60)}</div>
                 </div>
+                <button onClick={() => togglePublished(g)} className="rounded-md border border-primary/50 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary hover:text-primary-foreground">
+                  {g.published ? "Unpublish" : "Publish"}
+                </button>
                 <button onClick={() => remove(g.id)} className="rounded-md border border-destructive/40 px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive hover:text-destructive-foreground">
                   Delete
                 </button>
