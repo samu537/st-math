@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { getGame, type Game } from "@/lib/games-store";
+import { loadGames, type Game } from "@/lib/games-store";
 
 export const Route = createFileRoute("/play/$gameId")({
   component: PlayPage,
@@ -12,7 +12,8 @@ function PlayPage() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    getGame(gameId).then((g) => setGame(g));
+    const g = loadGames().find((g) => g.id === gameId);
+    setGame(g ?? null);
   }, [gameId]);
 
   const goFullscreen = () => {
