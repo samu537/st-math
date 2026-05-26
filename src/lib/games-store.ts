@@ -8,6 +8,7 @@ export type Game = {
   type: "url" | "html";
   content: string;
   createdAt: number;
+  published: boolean;
 };
 
 type Row = {
@@ -18,6 +19,7 @@ type Row = {
   type: string;
   content: string;
   created_at: string;
+  published: boolean | null;
 };
 
 const toGame = (r: Row): Game => ({
@@ -28,12 +30,14 @@ const toGame = (r: Row): Game => ({
   type: (r.type === "html" ? "html" : "url") as "url" | "html",
   content: r.content,
   createdAt: new Date(r.created_at).getTime(),
+  published: r.published ?? true,
 });
 
 export async function loadGames(): Promise<Game[]> {
   const { data, error } = await supabase
     .from("games")
-    .select("*")
+    .select("id,title,description,image,type,content,created_at,published")
+    .eq("published", true)
     .order("created_at", { ascending: false });
   if (error) {
     console.error("loadGames", error);
@@ -43,31 +47,12 @@ export async function loadGames(): Promise<Game[]> {
 }
 
 export async function getGame(id: string): Promise<Game | null> {
-  const { data, error } = await supabase.from("games").select("*").eq("id", id).maybeSingle();
-  if (error || !data) return null;
-  return toGame(data as Row);
-}
-
-export async function addGame(g: Omit<Game, "id" | "createdAt">): Promise<Game | null> {
   const { data, error } = await supabase
     .from("games")
-    .insert({
-      title: g.title,
-      description: g.description,
-      image: g.image,
-      type: g.type,
-      content: g.content,
-    })
-    .select()
-    .single();
-  if (error) {
-    console.error("addGame", error);
-    return null;
-  }
+    .select("id,title,description,image,type,content,created_at,published")
+    .eq("id", id)
+    .eq("published", true)
+    .maybeSingle();
+  if (error || !data) return null;
   return toGame(data as Row);
-}
-
-export async function deleteGame(id: string): Promise<void> {
-  const { error } = await supabase.from("games").delete().eq("id", id);
-  if (error) console.error("deleteGame", error);
 }

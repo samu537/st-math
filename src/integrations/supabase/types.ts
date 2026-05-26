@@ -21,6 +21,7 @@ export type Database = {
           description: string
           id: string
           image: string
+          published: boolean
           title: string
           type: string
         }
@@ -30,6 +31,7 @@ export type Database = {
           description?: string
           id?: string
           image?: string
+          published?: boolean
           title: string
           type: string
         }
@@ -39,6 +41,7 @@ export type Database = {
           description?: string
           id?: string
           image?: string
+          published?: boolean
           title?: string
           type?: string
         }
