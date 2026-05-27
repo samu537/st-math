@@ -119,3 +119,32 @@
 
 .samu-cursor-dot.active { width: 14px; height: 14px; }
 .samu-cursor-ring.active { width: 48px; height: 48px; border-color: var(--color-ember); }
+
+.samu-cursor-minimal {
+  width: 12px;
+  height: 12px;
+  box-shadow: 0 0 18px var(--color-primary), 0 0 36px var(--color-primary);
+}
+.samu-cursor-minimal.active { width: 20px; height: 20px; }
+
+.samu-cursor-cross-h,
+.samu-cursor-cross-v {
+  position: fixed;
+  background: var(--color-primary);
+  pointer-events: none;
+  z-index: 9997;
+  opacity: 0.5;
+  box-shadow: 0 0 8px var(--color-primary);
+}
+.samu-cursor-cross-h {
+  left: 0;
+  width: 100vw;
+  height: 1px;
+  transform: translateY(-50%);
+}
+.samu-cursor-cross-v {
+  top: 0;
+  width: 1px;
+  height: 100vh;
+  transform: translateX(-50%);
+}
