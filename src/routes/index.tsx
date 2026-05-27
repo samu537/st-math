@@ -50,39 +50,48 @@ function Index() {
             </Link>
           </div>
         ) : (
-          <div className="mx-auto flex max-w-3xl flex-col gap-5">
-            {games.map((g) => (
-              <Link
-                key={g.id}
-                to="/play/$gameId"
-                params={{ gameId: g.id }}
-                className="group flex flex-col gap-4 overflow-hidden rounded-2xl border border-border bg-card p-4 transition hover:border-primary hover:shadow-[0_0_40px_-10px_var(--color-primary)] sm:flex-row sm:items-center"
-              >
-                <div className="aspect-video w-full shrink-0 overflow-hidden rounded-lg bg-secondary sm:h-32 sm:w-56">
-                  {g.image ? (
-                    <img
-                      src={g.image}
-                      alt={g.title}
-                      className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-4xl font-black text-primary/30">
-                      {g.title.slice(0, 2).toUpperCase()}
+          <>
+            <div className="mb-6 flex items-end justify-between">
+              <h2 className="text-2xl font-black tracking-tight md:text-3xl">
+                Trending <span className="text-primary">Now</span>
+              </h2>
+              <span className="text-xs uppercase tracking-widest text-muted-foreground">
+                {games.length} {games.length === 1 ? "title" : "titles"}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 lg:gap-6">
+              {games.map((g) => (
+                <Link
+                  key={g.id}
+                  to="/play/$gameId"
+                  params={{ gameId: g.id }}
+                  className="group relative block overflow-hidden rounded-xl border border-border/60 bg-card transition duration-300 hover:z-10 hover:scale-[1.04] hover:border-primary hover:shadow-[0_0_40px_-5px_var(--color-primary)]"
+                >
+                  <div className="relative aspect-[2/3] w-full overflow-hidden bg-secondary">
+                    {g.image ? (
+                      <img
+                        src={g.image}
+                        alt={g.title}
+                        loading="lazy"
+                        className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-5xl font-black text-primary/30">
+                        {g.title.slice(0, 2).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent opacity-90" />
+                    <div className="absolute inset-x-0 bottom-0 p-3">
+                      <h3 className="line-clamp-1 text-sm font-bold md:text-base">{g.title}</h3>
+                      <div className="mt-1 flex items-center gap-1 text-xs font-semibold text-primary opacity-0 transition group-hover:opacity-100">
+                        ▶ Play
+                      </div>
                     </div>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-xl font-bold">{g.title}</h3>
-                  {g.description && (
-                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{g.description}</p>
-                  )}
-                  <div className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-primary transition group-hover:translate-x-1">
-                    Play now →
                   </div>
-                </div>
-              </Link>
-            ))}
-          </div>
+                </Link>
+              ))}
+            </div>
+          </>
         )}
       </section>
 
