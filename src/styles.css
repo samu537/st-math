@@ -70,6 +70,16 @@
   a, button, [role="button"], input, textarea, select {
     cursor: none !important;
   }
+
+  body.cursor-system, body.cursor-system * {
+    cursor: auto !important;
+  }
+  body.cursor-system a, body.cursor-system button, body.cursor-system [role="button"] {
+    cursor: pointer !important;
+  }
+  body.cursor-system input, body.cursor-system textarea {
+    cursor: text !important;
+  }
 }
 
 @keyframes pulse-ring {
