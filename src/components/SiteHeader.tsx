@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { SettingsPanel } from "@/components/SettingsPanel";
 
 export function SiteHeader() {
   return (
@@ -29,6 +30,7 @@ export function SiteHeader() {
           >
             Admin
           </Link>
+          <SettingsPanel />
         </nav>
       </div>
     </header>

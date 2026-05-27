@@ -1,10 +1,15 @@
 import { useEffect, useRef } from "react";
+import { useSettings } from "@/lib/settings-store";
 
 export function CustomCursor() {
+  const [settings] = useSettings();
   const dotRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<HTMLDivElement>(null);
+  const hRef = useRef<HTMLDivElement>(null);
+  const vRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (settings.cursor === "system") return;
     let mx = 0, my = 0, rx = 0, ry = 0;
     let raf = 0;
 
@@ -14,6 +19,8 @@ export function CustomCursor() {
         dotRef.current.style.left = mx + "px";
         dotRef.current.style.top = my + "px";
       }
+      if (hRef.current) hRef.current.style.top = my + "px";
+      if (vRef.current) vRef.current.style.left = mx + "px";
     };
     const loop = () => {
       rx += (mx - rx) * 0.18;
@@ -39,7 +46,23 @@ export function CustomCursor() {
       window.removeEventListener("mouseover", over);
       cancelAnimationFrame(raf);
     };
-  }, []);
+  }, [settings.cursor]);
+
+  if (settings.cursor === "system") return null;
+
+  if (settings.cursor === "crosshair") {
+    return (
+      <>
+        <div ref={hRef} className="samu-cursor-cross-h" />
+        <div ref={vRef} className="samu-cursor-cross-v" />
+        <div ref={dotRef} className="samu-cursor-dot" />
+      </>
+    );
+  }
+
+  if (settings.cursor === "minimal") {
+    return <div ref={dotRef} className="samu-cursor-dot samu-cursor-minimal" />;
+  }
 
   return (
     <>
