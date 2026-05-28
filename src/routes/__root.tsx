@@ -11,7 +11,6 @@ import {
 import appCss from "../styles.css?url";
 import { CustomCursor } from "@/components/CustomCursor";
 import { ChatRoom } from "@/components/ChatRoom";
-import { AuthProvider } from "@/lib/auth-context";
 
 function NotFoundComponent() {
   return (
@@ -120,11 +119,9 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <CustomCursor />
-        <Outlet />
-        <ChatRoom />
-      </AuthProvider>
+      <CustomCursor />
+      <Outlet />
+      <ChatRoom />
     </QueryClientProvider>
   );
 }
