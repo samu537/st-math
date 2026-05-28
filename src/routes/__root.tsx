@@ -10,6 +10,7 @@ import {
 
 import appCss from "../styles.css?url";
 import { CustomCursor } from "@/components/CustomCursor";
+import { ChatRoom } from "@/components/ChatRoom";
 
 function NotFoundComponent() {
   return (
@@ -120,6 +121,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <CustomCursor />
       <Outlet />
+      <ChatRoom />
     </QueryClientProvider>
   );
 }
