@@ -69,12 +69,21 @@ function Index() {
                 >
                   <div className="relative aspect-video w-full overflow-hidden bg-secondary">
                     {g.image ? (
-                      <img
-                        src={g.image}
-                        alt={g.title}
-                        loading="lazy"
-                        className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
-                      />
+                      <>
+                        <img
+                          src={g.image}
+                          alt=""
+                          aria-hidden
+                          loading="lazy"
+                          className="absolute inset-0 h-full w-full scale-110 object-cover blur-2xl brightness-50"
+                        />
+                        <img
+                          src={g.image}
+                          alt={g.title}
+                          loading="lazy"
+                          className="relative h-full w-full object-contain transition duration-500 group-hover:scale-105"
+                        />
+                      </>
                     ) : (
                       <div className="flex h-full items-center justify-center text-5xl font-black text-primary/30">
                         {g.title.slice(0, 2).toUpperCase()}
