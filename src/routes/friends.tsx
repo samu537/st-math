@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
+import { VoiceRoom } from "@/components/VoiceRoom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, type Profile } from "@/lib/auth-context";
+
 
 export const Route = createFileRoute("/friends")({
   component: FriendsPage,
@@ -13,8 +15,10 @@ type Row = { id: string; requester_id: string; addressee_id: string; status: "pe
 type Enriched = Row & { other: Profile | null; incoming: boolean };
 
 function FriendsPage() {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
   const [rows, setRows] = useState<Enriched[]>([]);
+  const [callWith, setCallWith] = useState<Profile | null>(null);
+
   const [uname, setUname] = useState("");
   const [msg, setMsg] = useState("");
 
@@ -94,11 +98,27 @@ function FriendsPage() {
       <Section title={`Your friends (${accepted.length})`}>
         {accepted.map((r) => (
           <Card key={r.id} prof={r.other}>
-            <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-black uppercase text-primary">friends</span>
+            {r.other && (
+              <button onClick={() => setCallWith(callWith?.id === r.other!.id ? null : r.other)} className="rounded-md bg-gradient-to-br from-primary to-ember px-3 py-1.5 text-xs font-black uppercase tracking-wider text-primary-foreground hover:brightness-110">
+                {callWith?.id === r.other.id ? "✕ End" : "📞 Call"}
+              </button>
+            )}
             <button onClick={() => remove(r.id)} className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-destructive">Remove</button>
           </Card>
         ))}
       </Section>
+
+      {callWith && user && (
+        <div className="mt-6">
+          <div className="mb-2 text-xs font-black uppercase tracking-widest text-muted-foreground">Calling {callWith.display_name}</div>
+          <VoiceRoom
+            roomId={`dm-${[user.id, callWith.id].sort().join("-")}`}
+            userId={user.id}
+            nickname={profile?.display_name ?? "you"}
+          />
+        </div>
+      )}
+
 
       <Section title={`Pending (${outgoing.length})`}>
         {outgoing.map((r) => (
