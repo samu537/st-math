@@ -19,8 +19,8 @@ export function SiteHeader() {
         </Link>
         <nav className="flex flex-wrap items-center gap-1.5 text-sm">
           <NavLink to="/">Library</NavLink>
+          <NavLink to="/groups">Groups</NavLink>
           {user && <NavLink to="/friends">Friends</NavLink>}
-
           <Link to="/admin" className="rounded-md border border-primary/50 bg-primary/10 px-3 py-2 font-semibold text-primary hover:bg-primary/20">Admin</Link>
           {user ? (
             <div className="flex items-center gap-2">
