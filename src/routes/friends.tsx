@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { VoiceRoom } from "@/components/VoiceRoom";
 import { supabase } from "@/integrations/supabase/client";
@@ -98,14 +98,23 @@ function FriendsPage() {
     }
   };
 
+  const loadRef = useRef(load);
+  const loadCallsRef = useRef(loadCalls);
+  loadRef.current = load;
+  loadCallsRef.current = loadCalls;
+
   useEffect(() => {
     if (!user) return;
-    load();
-    loadCalls();
+    void loadRef.current();
+    void loadCallsRef.current();
     const ch = supabase
       .channel("friends-" + user.id)
-      .on("postgres_changes", { event: "*", schema: "public", table: "friendships" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "voice_calls" }, loadCalls)
+      .on("postgres_changes", { event: "*", schema: "public", table: "friendships" }, () => {
+        void loadRef.current();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "voice_calls" }, () => {
+        void loadCallsRef.current();
+      })
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
