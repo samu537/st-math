@@ -43,10 +43,6 @@ export function VoiceRoom({ roomId, userId, nickname, autoJoin = false, onLeave 
 
   useEffect(() => () => cleanup(), []);
 
-  useEffect(() => {
-    if (autoJoin && !joined && !joining) void join();
-  }, [autoJoin, joined, joining]);
-
   const addPeerAudio = (peerToken: string, stream: MediaStream) => {
     if (!audioContainer.current) return;
     const existing = audioContainer.current.querySelector(
@@ -219,6 +215,10 @@ export function VoiceRoom({ roomId, userId, nickname, autoJoin = false, onLeave 
       setErr(e instanceof Error ? e.message : "Mic access denied");
     }
   };
+
+  useEffect(() => {
+    if (autoJoin && !joined && !joining) void join();
+  }, [autoJoin, joined, joining, join]);
 
   const toggleMute = () => {
     const tracks = localStreamRef.current?.getAudioTracks() ?? [];
