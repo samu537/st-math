@@ -2,17 +2,26 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 type Peer = { id: string; pc: RTCPeerConnection; stream: MediaStream };
+type VoiceRoomProps = {
+  roomId: string;
+  userId: string;
+  nickname: string;
+  autoJoin?: boolean;
+  onLeave?: () => void;
+};
 
 const ICE: RTCConfiguration = {
   iceServers: [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }],
 };
 
-export function VoiceRoom({ roomId, userId, nickname }: { roomId: string; userId: string; nickname: string }) {
+export function VoiceRoom({ roomId, userId, nickname, autoJoin = false, onLeave }: VoiceRoomProps) {
   const [joined, setJoined] = useState(false);
+  const [joining, setJoining] = useState(false);
   const [muted, setMuted] = useState(false);
   const [peers, setPeers] = useState<{ id: string; nickname: string; speaking: boolean }[]>([]);
   const [err, setErr] = useState("");
   const peersRef = useRef<Map<string, Peer>>(new Map());
+  const pendingIceRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const localStreamRef = useRef<MediaStream | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const audioContainer = useRef<HTMLDivElement>(null);
@@ -23,24 +32,53 @@ export function VoiceRoom({ roomId, userId, nickname }: { roomId: string; userId
     localStreamRef.current = null;
     peersRef.current.forEach((p) => p.pc.close());
     peersRef.current.clear();
+    pendingIceRef.current.clear();
     if (channelRef.current) supabase.removeChannel(channelRef.current);
     channelRef.current = null;
     audioContainer.current?.replaceChildren();
     setPeers([]);
     setJoined(false);
+    setJoining(false);
   };
 
   useEffect(() => () => cleanup(), []);
 
   const addPeerAudio = (peerToken: string, stream: MediaStream) => {
     if (!audioContainer.current) return;
-    const existing = audioContainer.current.querySelector(`[data-peer="${peerToken}"]`) as HTMLAudioElement | null;
-    if (existing) { existing.srcObject = stream; return; }
+    const existing = audioContainer.current.querySelector(
+      `[data-peer="${peerToken}"]`,
+    ) as HTMLAudioElement | null;
+    if (existing) {
+      existing.srcObject = stream;
+      return;
+    }
     const el = document.createElement("audio");
     el.autoplay = true;
     el.dataset.peer = peerToken;
     el.srcObject = stream;
     audioContainer.current.appendChild(el);
+    void el
+      .play()
+      .catch(() => setErr("Tap Join voice again if your browser blocked audio playback."));
+  };
+
+  const addIce = async (peerToken: string, candidate: RTCIceCandidateInit) => {
+    const peer = peersRef.current.get(peerToken);
+    if (!peer) return;
+    if (!peer.pc.remoteDescription) {
+      pendingIceRef.current.set(peerToken, [
+        ...(pendingIceRef.current.get(peerToken) ?? []),
+        candidate,
+      ]);
+      return;
+    }
+    await peer.pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(() => {});
+  };
+
+  const flushIce = async (peerToken: string) => {
+    const queued = pendingIceRef.current.get(peerToken) ?? [];
+    pendingIceRef.current.delete(peerToken);
+    for (const candidate of queued) await addIce(peerToken, candidate);
   };
 
   const makePeer = (peerToken: string, peerNick: string, initiator: boolean): Peer => {
@@ -52,53 +90,103 @@ export function VoiceRoom({ roomId, userId, nickname }: { roomId: string; userId
       addPeerAudio(peerToken, stream);
     };
     pc.onicecandidate = (e) => {
-      if (e.candidate) channelRef.current?.send({ type: "broadcast", event: "ice", payload: { from: selfTokenRef.current, to: peerToken, candidate: e.candidate } });
+      if (e.candidate)
+        channelRef.current?.send({
+          type: "broadcast",
+          event: "ice",
+          payload: { from: selfTokenRef.current, to: peerToken, candidate: e.candidate },
+        });
     };
     const peer: Peer = { id: peerToken, pc, stream };
     peersRef.current.set(peerToken, peer);
-    setPeers((prev) => prev.find((p) => p.id === peerToken) ? prev : [...prev, { id: peerToken, nickname: peerNick, speaking: false }]);
+    setPeers((prev) =>
+      prev.find((p) => p.id === peerToken)
+        ? prev
+        : [...prev, { id: peerToken, nickname: peerNick, speaking: false }],
+    );
 
     if (initiator) {
-      pc.createOffer().then((o) => pc.setLocalDescription(o)).then(() => {
-        channelRef.current?.send({ type: "broadcast", event: "offer", payload: { from: selfTokenRef.current, fromNick: nickname, to: peerToken, sdp: pc.localDescription } });
-      });
+      pc.createOffer()
+        .then((o) => pc.setLocalDescription(o))
+        .then(() =>
+          channelRef.current?.send({
+            type: "broadcast",
+            event: "offer",
+            payload: {
+              from: selfTokenRef.current,
+              fromNick: nickname,
+              to: peerToken,
+              sdp: pc.localDescription,
+            },
+          }),
+        )
+        .catch((e) => setErr(e instanceof Error ? e.message : "Could not start the call."));
     }
     return peer;
   };
 
   const removePeer = (peerToken: string) => {
     const p = peersRef.current.get(peerToken);
-    if (p) { p.pc.close(); peersRef.current.delete(peerToken); }
+    if (p) {
+      p.pc.close();
+      peersRef.current.delete(peerToken);
+    }
+    pendingIceRef.current.delete(peerToken);
     audioContainer.current?.querySelector(`[data-peer="${peerToken}"]`)?.remove();
     setPeers((prev) => prev.filter((x) => x.id !== peerToken));
   };
 
+  const leave = () => {
+    cleanup();
+    onLeave?.();
+  };
+
   const join = async () => {
+    if (joined || joining) return;
     setErr("");
+    setJoining(true);
     try {
+      if (!navigator.mediaDevices?.getUserMedia)
+        throw new Error("Voice chat needs microphone access in a secure browser tab.");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
       localStreamRef.current = stream;
-      const channel = supabase.channel(`voice-${roomId}`, { config: { presence: { key: selfTokenRef.current } } });
+      const channel = supabase.channel(`voice-${roomId}`, {
+        config: { presence: { key: selfTokenRef.current } },
+      });
       channelRef.current = channel;
 
-      channel.on("broadcast", { event: "offer" }, ({ payload }) => {
+      channel.on("broadcast", { event: "offer" }, async ({ payload }) => {
         if (payload.to !== selfTokenRef.current) return;
         let peer = peersRef.current.get(payload.from);
         if (!peer) peer = makePeer(payload.from, payload.fromNick ?? "peer", false);
-        peer.pc.setRemoteDescription(new RTCSessionDescription(payload.sdp))
-          .then(() => peer!.pc.createAnswer())
-          .then((a) => peer!.pc.setLocalDescription(a))
-          .then(() => channel.send({ type: "broadcast", event: "answer", payload: { from: selfTokenRef.current, to: payload.from, sdp: peer!.pc.localDescription } }));
+        try {
+          await peer.pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+          await flushIce(payload.from);
+          const answer = await peer.pc.createAnswer();
+          await peer.pc.setLocalDescription(answer);
+          await channel.send({
+            type: "broadcast",
+            event: "answer",
+            payload: {
+              from: selfTokenRef.current,
+              to: payload.from,
+              sdp: peer.pc.localDescription,
+            },
+          });
+        } catch (e) {
+          setErr(e instanceof Error ? e.message : "Could not answer the call.");
+        }
       });
-      channel.on("broadcast", { event: "answer" }, ({ payload }) => {
+      channel.on("broadcast", { event: "answer" }, async ({ payload }) => {
         if (payload.to !== selfTokenRef.current) return;
         const peer = peersRef.current.get(payload.from);
-        peer?.pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+        if (!peer || peer.pc.signalingState === "stable") return;
+        await peer.pc.setRemoteDescription(new RTCSessionDescription(payload.sdp)).catch(() => {});
+        await flushIce(payload.from);
       });
       channel.on("broadcast", { event: "ice" }, ({ payload }) => {
         if (payload.to !== selfTokenRef.current) return;
-        const peer = peersRef.current.get(payload.from);
-        peer?.pc.addIceCandidate(new RTCIceCandidate(payload.candidate)).catch(() => {});
+        void addIce(payload.from, payload.candidate);
       });
       channel.on("presence", { event: "sync" }, () => {
         const state = channel.presenceState() as Record<string, { nickname: string }[]>;
@@ -110,19 +198,30 @@ export function VoiceRoom({ roomId, userId, nickname }: { roomId: string; userId
           }
         });
         // Remove peers no longer present
-        peersRef.current.forEach((_, id) => { if (!tokens.includes(id)) removePeer(id); });
+        peersRef.current.forEach((_, id) => {
+          if (!tokens.includes(id)) removePeer(id);
+        });
       });
 
       await channel.subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
           await channel.track({ nickname });
           setJoined(true);
+          setJoining(false);
         }
       });
     } catch (e) {
+      setJoining(false);
       setErr(e instanceof Error ? e.message : "Mic access denied");
     }
   };
+
+  const joinRef = useRef(join);
+  joinRef.current = join;
+
+  useEffect(() => {
+    if (autoJoin && !joined && !joining) void joinRef.current();
+  }, [autoJoin, joined, joining]);
 
   const toggleMute = () => {
     const tracks = localStreamRef.current?.getAudioTracks() ?? [];
@@ -134,19 +233,33 @@ export function VoiceRoom({ roomId, userId, nickname }: { roomId: string; userId
     <div className="rounded-xl border border-border bg-card p-4">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <div className="text-xs font-black uppercase tracking-widest text-muted-foreground">🎙 Voice room</div>
-          <div className="mt-0.5 text-sm font-bold">{joined ? `Connected — ${peers.length + 1} in call` : "Not connected"}</div>
+          <div className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+            🎙 Voice room
+          </div>
+          <div className="mt-0.5 text-sm font-bold">
+            {joined ? `Connected — ${peers.length + 1} in call` : "Not connected"}
+          </div>
         </div>
         {!joined ? (
-          <button onClick={join} className="rounded-md bg-gradient-to-br from-primary to-ember px-4 py-2 text-sm font-bold text-primary-foreground hover:brightness-110">
-            Join voice
+          <button
+            onClick={join}
+            disabled={joining}
+            className="rounded-md bg-gradient-to-br from-primary to-ember px-4 py-2 text-sm font-bold text-primary-foreground hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {joining ? "Joining…" : "Join voice"}
           </button>
         ) : (
           <div className="flex gap-2">
-            <button onClick={toggleMute} className={`rounded-md border px-3 py-2 text-sm font-bold ${muted ? "border-destructive text-destructive" : "border-border text-foreground"}`}>
+            <button
+              onClick={toggleMute}
+              className={`rounded-md border px-3 py-2 text-sm font-bold ${muted ? "border-destructive text-destructive" : "border-border text-foreground"}`}
+            >
               {muted ? "🔇 Muted" : "🎤 Live"}
             </button>
-            <button onClick={cleanup} className="rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-sm font-bold text-destructive hover:bg-destructive hover:text-destructive-foreground">
+            <button
+              onClick={leave}
+              className="rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-sm font-bold text-destructive hover:bg-destructive hover:text-destructive-foreground"
+            >
               Leave
             </button>
           </div>
@@ -156,7 +269,9 @@ export function VoiceRoom({ roomId, userId, nickname }: { roomId: string; userId
       {joined && (
         <div className="mt-3 flex flex-wrap gap-2">
           <Chip nickname={nickname + " (you)"} />
-          {peers.map((p) => <Chip key={p.id} nickname={p.nickname} />)}
+          {peers.map((p) => (
+            <Chip key={p.id} nickname={p.nickname} />
+          ))}
         </div>
       )}
       <div ref={audioContainer} className="hidden" />

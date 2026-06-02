@@ -1,0 +1,1 @@
+ALTER FUNCTION public.protect_voice_call_parties() SECURITY INVOKER;
