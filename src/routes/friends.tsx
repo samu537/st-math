@@ -13,11 +13,21 @@ export const Route = createFileRoute("/friends")({
 
 type Row = { id: string; requester_id: string; addressee_id: string; status: "pending" | "accepted" };
 type Enriched = Row & { other: Profile | null; incoming: boolean };
+type VoiceCall = {
+  id: string;
+  caller_id: string;
+  callee_id: string;
+  room_id: string;
+  status: "ringing" | "answered" | "declined" | "ended";
+  created_at: string;
+};
 
 function FriendsPage() {
   const { user, profile, loading } = useAuth();
   const [rows, setRows] = useState<Enriched[]>([]);
-  const [callWith, setCallWith] = useState<Profile | null>(null);
+  const [activeCall, setActiveCall] = useState<VoiceCall | null>(null);
+  const [calls, setCalls] = useState<VoiceCall[]>([]);
+  const [callProfiles, setCallProfiles] = useState<Record<string, Profile>>({});
 
   const [uname, setUname] = useState("");
   const [msg, setMsg] = useState("");
@@ -38,11 +48,31 @@ function FriendsPage() {
     }));
   };
 
+  const loadCalls = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("voice_calls")
+      .select("id,caller_id,callee_id,room_id,status,created_at")
+      .or(`caller_id.eq.${user.id},callee_id.eq.${user.id}`)
+      .in("status", ["ringing", "answered"])
+      .order("created_at", { ascending: false });
+    const list = (data ?? []) as VoiceCall[];
+    setCalls(list);
+    setActiveCall((current) => current && list.some((call) => call.id === current.id) ? list.find((call) => call.id === current.id)! : list[0] ?? null);
+    const ids = Array.from(new Set(list.flatMap((call) => [call.caller_id, call.callee_id]).filter((id) => id !== user.id)));
+    if (ids.length) {
+      const { data: profs } = await supabase.from("profiles").select("id,username,display_name,color").in("id", ids);
+      setCallProfiles((prev) => ({ ...prev, ...Object.fromEntries(((profs ?? []) as Profile[]).map((p) => [p.id, p])) }));
+    }
+  };
+
   useEffect(() => {
     if (!user) return;
     load();
+    loadCalls();
     const ch = supabase.channel("friends-" + user.id)
       .on("postgres_changes", { event: "*", schema: "public", table: "friendships" }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "voice_calls" }, loadCalls)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [user]);
@@ -70,9 +100,40 @@ function FriendsPage() {
     await supabase.from("friendships").delete().eq("id", id);
   };
 
+  const roomFor = (friendId: string) => `dm-${[user.id, friendId].sort().join("-")}`;
+
+  const startCall = async (friend: Profile) => {
+    setMsg("");
+    const { data, error } = await supabase
+      .from("voice_calls")
+      .insert({ caller_id: user.id, callee_id: friend.id, room_id: roomFor(friend.id), status: "ringing" })
+      .select("id,caller_id,callee_id,room_id,status,created_at")
+      .single();
+    if (error) { setMsg(error.message); return; }
+    const call = data as VoiceCall;
+    setCallProfiles((prev) => ({ ...prev, [friend.id]: friend }));
+    setCalls((prev) => [call, ...prev]);
+    setActiveCall(call);
+  };
+
+  const answerCall = async (call: VoiceCall) => {
+    await supabase.from("voice_calls").update({ status: "answered" }).eq("id", call.id);
+    setActiveCall({ ...call, status: "answered" });
+    await loadCalls();
+  };
+
+  const finishCall = async (call: VoiceCall, status: "declined" | "ended" = "ended") => {
+    await supabase.from("voice_calls").update({ status }).eq("id", call.id);
+    setCalls((prev) => prev.filter((x) => x.id !== call.id));
+    setActiveCall((current) => current?.id === call.id ? null : current);
+  };
+
   const accepted = rows.filter((r) => r.status === "accepted");
   const incoming = rows.filter((r) => r.status === "pending" && r.incoming);
   const outgoing = rows.filter((r) => r.status === "pending" && !r.incoming);
+  const incomingCalls = calls.filter((call) => call.callee_id === user.id && call.status === "ringing");
+  const activeFriendId = activeCall ? (activeCall.caller_id === user.id ? activeCall.callee_id : activeCall.caller_id) : null;
+  const activeFriend = activeFriendId ? callProfiles[activeFriendId] ?? accepted.find((r) => r.other?.id === activeFriendId)?.other ?? null : null;
 
   return (
     <Shell>
