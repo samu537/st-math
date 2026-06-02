@@ -147,6 +147,24 @@ function FriendsPage() {
       </form>
       {msg && <p className="mt-2 text-sm text-primary">{msg}</p>}
 
+      {incomingCalls.length > 0 && (
+        <div className="mt-6 space-y-2">
+          {incomingCalls.map((call) => {
+            const caller = callProfiles[call.caller_id] ?? accepted.find((r) => r.other?.id === call.caller_id)?.other;
+            return (
+              <div key={call.id} className="flex items-center gap-3 rounded-lg border border-primary/50 bg-primary/10 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-black uppercase tracking-widest text-primary">Incoming call</div>
+                  <div className="truncate font-bold">{caller?.display_name ?? "Friend"} is calling…</div>
+                </div>
+                <button onClick={() => answerCall(call)} className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:brightness-110">Answer</button>
+                <button onClick={() => finishCall(call, "declined")} className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-destructive">Decline</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       <Section title={`Incoming requests (${incoming.length})`}>
         {incoming.map((r) => (
           <Card key={r.id} prof={r.other}>
@@ -160,8 +178,8 @@ function FriendsPage() {
         {accepted.map((r) => (
           <Card key={r.id} prof={r.other}>
             {r.other && (
-              <button onClick={() => setCallWith(callWith?.id === r.other!.id ? null : r.other)} className="rounded-md bg-gradient-to-br from-primary to-ember px-3 py-1.5 text-xs font-black uppercase tracking-wider text-primary-foreground hover:brightness-110">
-                {callWith?.id === r.other.id ? "✕ End" : "📞 Call"}
+              <button onClick={() => activeFriendId === r.other!.id && activeCall ? finishCall(activeCall) : startCall(r.other!)} className="rounded-md bg-gradient-to-br from-primary to-ember px-3 py-1.5 text-xs font-black uppercase tracking-wider text-primary-foreground hover:brightness-110">
+                {activeFriendId === r.other.id ? "✕ End" : "📞 Call"}
               </button>
             )}
             <button onClick={() => remove(r.id)} className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-destructive">Remove</button>
@@ -169,13 +187,17 @@ function FriendsPage() {
         ))}
       </Section>
 
-      {callWith && user && (
+      {activeCall && user && activeFriend && (activeCall.status === "answered" || activeCall.caller_id === user.id) && (
         <div className="mt-6">
-          <div className="mb-2 text-xs font-black uppercase tracking-widest text-muted-foreground">Calling {callWith.display_name}</div>
+          <div className="mb-2 text-xs font-black uppercase tracking-widest text-muted-foreground">
+            {activeCall.status === "ringing" ? `Ringing ${activeFriend.display_name}…` : `In call with ${activeFriend.display_name}`}
+          </div>
           <VoiceRoom
-            roomId={`dm-${[user.id, callWith.id].sort().join("-")}`}
+            roomId={activeCall.room_id}
             userId={user.id}
             nickname={profile?.display_name ?? "you"}
+            autoJoin
+            onLeave={() => finishCall(activeCall)}
           />
         </div>
       )}
