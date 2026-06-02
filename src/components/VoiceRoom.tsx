@@ -2,13 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 type Peer = { id: string; pc: RTCPeerConnection; stream: MediaStream };
-type VoiceRoomProps = { roomId: string; userId: string; nickname: string; autoJoin?: boolean };
+type VoiceRoomProps = { roomId: string; userId: string; nickname: string; autoJoin?: boolean; onLeave?: () => void };
 
 const ICE: RTCConfiguration = {
   iceServers: [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }],
 };
 
-export function VoiceRoom({ roomId, userId, nickname, autoJoin = false }: VoiceRoomProps) {
+export function VoiceRoom({ roomId, userId, nickname, autoJoin = false, onLeave }: VoiceRoomProps) {
   const [joined, setJoined] = useState(false);
   const [joining, setJoining] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -101,6 +101,11 @@ export function VoiceRoom({ roomId, userId, nickname, autoJoin = false }: VoiceR
     setPeers((prev) => prev.filter((x) => x.id !== peerToken));
   };
 
+  const leave = () => {
+    cleanup();
+    onLeave?.();
+  };
+
   const join = async () => {
     if (joined || joining) return;
     setErr("");
@@ -185,7 +190,7 @@ export function VoiceRoom({ roomId, userId, nickname, autoJoin = false }: VoiceR
             <button onClick={toggleMute} className={`rounded-md border px-3 py-2 text-sm font-bold ${muted ? "border-destructive text-destructive" : "border-border text-foreground"}`}>
               {muted ? "🔇 Muted" : "🎤 Live"}
             </button>
-            <button onClick={cleanup} className="rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-sm font-bold text-destructive hover:bg-destructive hover:text-destructive-foreground">
+            <button onClick={leave} className="rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-sm font-bold text-destructive hover:bg-destructive hover:text-destructive-foreground">
               Leave
             </button>
           </div>
