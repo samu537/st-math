@@ -216,9 +216,12 @@ export function VoiceRoom({ roomId, userId, nickname, autoJoin = false, onLeave 
     }
   };
 
+  const joinRef = useRef(join);
+  joinRef.current = join;
+
   useEffect(() => {
-    if (autoJoin && !joined && !joining) void join();
-  }, [autoJoin, joined, joining, join]);
+    if (autoJoin && !joined && !joining) void joinRef.current();
+  }, [autoJoin, joined, joining]);
 
   const toggleMute = () => {
     const tracks = localStreamRef.current?.getAudioTracks() ?? [];
