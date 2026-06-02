@@ -5,13 +5,17 @@ import { VoiceRoom } from "@/components/VoiceRoom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, type Profile } from "@/lib/auth-context";
 
-
 export const Route = createFileRoute("/friends")({
   component: FriendsPage,
   head: () => ({ meta: [{ title: "Friends · Samu Game Hub" }] }),
 });
 
-type Row = { id: string; requester_id: string; addressee_id: string; status: "pending" | "accepted" };
+type Row = {
+  id: string;
+  requester_id: string;
+  addressee_id: string;
+  status: "pending" | "accepted";
+};
 type Enriched = Row & { other: Profile | null; incoming: boolean };
 type VoiceCall = {
   id: string;
@@ -35,17 +39,31 @@ function FriendsPage() {
   const load = async () => {
     if (!user) return;
     const { data } = await supabase
-      .from("friendships").select("id,requester_id,addressee_id,status")
+      .from("friendships")
+      .select("id,requester_id,addressee_id,status")
       .or(`requester_id.eq.${user.id},addressee_id.eq.${user.id}`);
     const list = (data ?? []) as Row[];
-    const otherIds = list.map((r) => r.requester_id === user.id ? r.addressee_id : r.requester_id);
+    const otherIds = list.map((r) =>
+      r.requester_id === user.id ? r.addressee_id : r.requester_id,
+    );
     const profs = otherIds.length
-      ? (await supabase.from("profiles").select("id,username,display_name,color").in("id", otherIds)).data as Profile[]
+      ? ((
+          await supabase
+            .from("profiles")
+            .select("id,username,display_name,color")
+            .in("id", otherIds)
+        ).data as Profile[])
       : [];
-    setRows(list.map((r) => {
-      const otherId = r.requester_id === user.id ? r.addressee_id : r.requester_id;
-      return { ...r, other: profs.find((p) => p.id === otherId) ?? null, incoming: r.addressee_id === user.id };
-    }));
+    setRows(
+      list.map((r) => {
+        const otherId = r.requester_id === user.id ? r.addressee_id : r.requester_id;
+        return {
+          ...r,
+          other: profs.find((p) => p.id === otherId) ?? null,
+          incoming: r.addressee_id === user.id,
+        };
+      }),
+    );
   };
 
   const loadCalls = async () => {
@@ -58,11 +76,25 @@ function FriendsPage() {
       .order("created_at", { ascending: false });
     const list = (data ?? []) as VoiceCall[];
     setCalls(list);
-    setActiveCall((current) => current && list.some((call) => call.id === current.id) ? list.find((call) => call.id === current.id)! : list[0] ?? null);
-    const ids = Array.from(new Set(list.flatMap((call) => [call.caller_id, call.callee_id]).filter((id) => id !== user.id)));
+    setActiveCall((current) =>
+      current && list.some((call) => call.id === current.id)
+        ? list.find((call) => call.id === current.id)!
+        : (list[0] ?? null),
+    );
+    const ids = Array.from(
+      new Set(
+        list.flatMap((call) => [call.caller_id, call.callee_id]).filter((id) => id !== user.id),
+      ),
+    );
     if (ids.length) {
-      const { data: profs } = await supabase.from("profiles").select("id,username,display_name,color").in("id", ids);
-      setCallProfiles((prev) => ({ ...prev, ...Object.fromEntries(((profs ?? []) as Profile[]).map((p) => [p.id, p])) }));
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id,username,display_name,color")
+        .in("id", ids);
+      setCallProfiles((prev) => ({
+        ...prev,
+        ...Object.fromEntries(((profs ?? []) as Profile[]).map((p) => [p.id, p])),
+      }));
     }
   };
 
@@ -70,27 +102,55 @@ function FriendsPage() {
     if (!user) return;
     load();
     loadCalls();
-    const ch = supabase.channel("friends-" + user.id)
+    const ch = supabase
+      .channel("friends-" + user.id)
       .on("postgres_changes", { event: "*", schema: "public", table: "friendships" }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "voice_calls" }, loadCalls)
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    return () => {
+      supabase.removeChannel(ch);
+    };
   }, [user]);
 
-  if (loading) return <Shell><p className="text-muted-foreground">Loading…</p></Shell>;
-  if (!user) return <Shell><LoginPrompt /></Shell>;
+  if (loading)
+    return (
+      <Shell>
+        <p className="text-muted-foreground">Loading…</p>
+      </Shell>
+    );
+  if (!user)
+    return (
+      <Shell>
+        <LoginPrompt />
+      </Shell>
+    );
 
   const add = async (e: FormEvent) => {
     e.preventDefault();
     setMsg("");
     const clean = uname.trim().toLowerCase();
     if (!clean) return;
-    const { data: prof } = await supabase.from("profiles").select("id").eq("username", clean).maybeSingle();
-    if (!prof) { setMsg("No user with that name."); return; }
-    if (prof.id === user.id) { setMsg("That's you 🙂"); return; }
-    const { error } = await supabase.from("friendships").insert({ requester_id: user.id, addressee_id: prof.id });
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("username", clean)
+      .maybeSingle();
+    if (!prof) {
+      setMsg("No user with that name.");
+      return;
+    }
+    if (prof.id === user.id) {
+      setMsg("That's you 🙂");
+      return;
+    }
+    const { error } = await supabase
+      .from("friendships")
+      .insert({ requester_id: user.id, addressee_id: prof.id });
     if (error) setMsg(error.message);
-    else { setMsg("Friend request sent!"); setUname(""); }
+    else {
+      setMsg("Friend request sent!");
+      setUname("");
+    }
   };
 
   const accept = async (id: string) => {
@@ -106,10 +166,18 @@ function FriendsPage() {
     setMsg("");
     const { data, error } = await supabase
       .from("voice_calls")
-      .insert({ caller_id: user.id, callee_id: friend.id, room_id: roomFor(friend.id), status: "ringing" })
+      .insert({
+        caller_id: user.id,
+        callee_id: friend.id,
+        room_id: roomFor(friend.id),
+        status: "ringing",
+      })
       .select("id,caller_id,callee_id,room_id,status,created_at")
       .single();
-    if (error) { setMsg(error.message); return; }
+    if (error) {
+      setMsg(error.message);
+      return;
+    }
     const call = data as VoiceCall;
     setCallProfiles((prev) => ({ ...prev, [friend.id]: friend }));
     setCalls((prev) => [call, ...prev]);
@@ -125,15 +193,25 @@ function FriendsPage() {
   const finishCall = async (call: VoiceCall, status: "declined" | "ended" = "ended") => {
     await supabase.from("voice_calls").update({ status }).eq("id", call.id);
     setCalls((prev) => prev.filter((x) => x.id !== call.id));
-    setActiveCall((current) => current?.id === call.id ? null : current);
+    setActiveCall((current) => (current?.id === call.id ? null : current));
   };
 
   const accepted = rows.filter((r) => r.status === "accepted");
   const incoming = rows.filter((r) => r.status === "pending" && r.incoming);
   const outgoing = rows.filter((r) => r.status === "pending" && !r.incoming);
-  const incomingCalls = calls.filter((call) => call.callee_id === user.id && call.status === "ringing");
-  const activeFriendId = activeCall ? (activeCall.caller_id === user.id ? activeCall.callee_id : activeCall.caller_id) : null;
-  const activeFriend = activeFriendId ? callProfiles[activeFriendId] ?? accepted.find((r) => r.other?.id === activeFriendId)?.other ?? null : null;
+  const incomingCalls = calls.filter(
+    (call) => call.callee_id === user.id && call.status === "ringing",
+  );
+  const activeFriendId = activeCall
+    ? activeCall.caller_id === user.id
+      ? activeCall.callee_id
+      : activeCall.caller_id
+    : null;
+  const activeFriend = activeFriendId
+    ? (callProfiles[activeFriendId] ??
+      accepted.find((r) => r.other?.id === activeFriendId)?.other ??
+      null)
+    : null;
 
   return (
     <Shell>
@@ -141,24 +219,49 @@ function FriendsPage() {
       <p className="mt-1 text-muted-foreground">Find players by username and play together.</p>
 
       <form onSubmit={add} className="mt-6 flex gap-2 rounded-xl border border-border bg-card p-4">
-        <input value={uname} onChange={(e) => setUname(e.target.value)} placeholder="Add friend by username…"
-          className="flex-1 rounded-md border border-border bg-input px-3 py-2 outline-none focus:border-primary" />
-        <button className="rounded-md bg-gradient-to-br from-primary to-ember px-4 py-2 font-bold text-primary-foreground hover:brightness-110">Send request</button>
+        <input
+          value={uname}
+          onChange={(e) => setUname(e.target.value)}
+          placeholder="Add friend by username…"
+          className="flex-1 rounded-md border border-border bg-input px-3 py-2 outline-none focus:border-primary"
+        />
+        <button className="rounded-md bg-gradient-to-br from-primary to-ember px-4 py-2 font-bold text-primary-foreground hover:brightness-110">
+          Send request
+        </button>
       </form>
       {msg && <p className="mt-2 text-sm text-primary">{msg}</p>}
 
       {incomingCalls.length > 0 && (
         <div className="mt-6 space-y-2">
           {incomingCalls.map((call) => {
-            const caller = callProfiles[call.caller_id] ?? accepted.find((r) => r.other?.id === call.caller_id)?.other;
+            const caller =
+              callProfiles[call.caller_id] ??
+              accepted.find((r) => r.other?.id === call.caller_id)?.other;
             return (
-              <div key={call.id} className="flex items-center gap-3 rounded-lg border border-primary/50 bg-primary/10 px-4 py-3">
+              <div
+                key={call.id}
+                className="flex items-center gap-3 rounded-lg border border-primary/50 bg-primary/10 px-4 py-3"
+              >
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs font-black uppercase tracking-widest text-primary">Incoming call</div>
-                  <div className="truncate font-bold">{caller?.display_name ?? "Friend"} is calling…</div>
+                  <div className="text-xs font-black uppercase tracking-widest text-primary">
+                    Incoming call
+                  </div>
+                  <div className="truncate font-bold">
+                    {caller?.display_name ?? "Friend"} is calling…
+                  </div>
                 </div>
-                <button onClick={() => answerCall(call)} className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:brightness-110">Answer</button>
-                <button onClick={() => finishCall(call, "declined")} className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-destructive">Decline</button>
+                <button
+                  onClick={() => answerCall(call)}
+                  className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:brightness-110"
+                >
+                  Answer
+                </button>
+                <button
+                  onClick={() => finishCall(call, "declined")}
+                  className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-destructive"
+                >
+                  Decline
+                </button>
               </div>
             );
           })}
@@ -168,8 +271,18 @@ function FriendsPage() {
       <Section title={`Incoming requests (${incoming.length})`}>
         {incoming.map((r) => (
           <Card key={r.id} prof={r.other}>
-            <button onClick={() => accept(r.id)} className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:brightness-110">Accept</button>
-            <button onClick={() => remove(r.id)} className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-destructive">Decline</button>
+            <button
+              onClick={() => accept(r.id)}
+              className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:brightness-110"
+            >
+              Accept
+            </button>
+            <button
+              onClick={() => remove(r.id)}
+              className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-destructive"
+            >
+              Decline
+            </button>
           </Card>
         ))}
       </Section>
@@ -178,36 +291,57 @@ function FriendsPage() {
         {accepted.map((r) => (
           <Card key={r.id} prof={r.other}>
             {r.other && (
-              <button onClick={() => activeFriendId === r.other!.id && activeCall ? finishCall(activeCall) : startCall(r.other!)} className="rounded-md bg-gradient-to-br from-primary to-ember px-3 py-1.5 text-xs font-black uppercase tracking-wider text-primary-foreground hover:brightness-110">
+              <button
+                onClick={() =>
+                  activeFriendId === r.other!.id && activeCall
+                    ? finishCall(activeCall)
+                    : startCall(r.other!)
+                }
+                className="rounded-md bg-gradient-to-br from-primary to-ember px-3 py-1.5 text-xs font-black uppercase tracking-wider text-primary-foreground hover:brightness-110"
+              >
                 {activeFriendId === r.other.id ? "✕ End" : "📞 Call"}
               </button>
             )}
-            <button onClick={() => remove(r.id)} className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-destructive">Remove</button>
+            <button
+              onClick={() => remove(r.id)}
+              className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-destructive"
+            >
+              Remove
+            </button>
           </Card>
         ))}
       </Section>
 
-      {activeCall && user && activeFriend && (activeCall.status === "answered" || activeCall.caller_id === user.id) && (
-        <div className="mt-6">
-          <div className="mb-2 text-xs font-black uppercase tracking-widest text-muted-foreground">
-            {activeCall.status === "ringing" ? `Ringing ${activeFriend.display_name}…` : `In call with ${activeFriend.display_name}`}
+      {activeCall &&
+        user &&
+        activeFriend &&
+        (activeCall.status === "answered" || activeCall.caller_id === user.id) && (
+          <div className="mt-6">
+            <div className="mb-2 text-xs font-black uppercase tracking-widest text-muted-foreground">
+              {activeCall.status === "ringing"
+                ? `Ringing ${activeFriend.display_name}…`
+                : `In call with ${activeFriend.display_name}`}
+            </div>
+            <VoiceRoom
+              roomId={activeCall.room_id}
+              userId={user.id}
+              nickname={profile?.display_name ?? "you"}
+              autoJoin
+              onLeave={() => finishCall(activeCall)}
+            />
           </div>
-          <VoiceRoom
-            roomId={activeCall.room_id}
-            userId={user.id}
-            nickname={profile?.display_name ?? "you"}
-            autoJoin
-            onLeave={() => finishCall(activeCall)}
-          />
-        </div>
-      )}
-
+        )}
 
       <Section title={`Pending (${outgoing.length})`}>
         {outgoing.map((r) => (
           <Card key={r.id} prof={r.other}>
             <span className="text-xs text-muted-foreground">waiting…</span>
-            <button onClick={() => remove(r.id)} className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-destructive">Cancel</button>
+            <button
+              onClick={() => remove(r.id)}
+              className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-destructive"
+            >
+              Cancel
+            </button>
           </Card>
         ))}
       </Section>
@@ -219,8 +353,14 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   const arr = Array.isArray(children) ? children : [children];
   return (
     <div className="mt-8">
-      <h2 className="mb-3 text-xs font-black uppercase tracking-widest text-muted-foreground">{title}</h2>
-      {arr.length === 0 ? <p className="text-sm text-muted-foreground/70">Nothing here yet.</p> : <div className="space-y-2">{children}</div>}
+      <h2 className="mb-3 text-xs font-black uppercase tracking-widest text-muted-foreground">
+        {title}
+      </h2>
+      {arr.length === 0 ? (
+        <p className="text-sm text-muted-foreground/70">Nothing here yet.</p>
+      ) : (
+        <div className="space-y-2">{children}</div>
+      )}
     </div>
   );
 }
@@ -228,7 +368,10 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Card({ prof, children }: { prof: Profile | null; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
-      <div className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-black text-white" style={{ backgroundColor: prof?.color ?? "#666" }}>
+      <div
+        className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-black text-white"
+        style={{ backgroundColor: prof?.color ?? "#666" }}
+      >
         {(prof?.display_name ?? "?").slice(0, 2).toUpperCase()}
       </div>
       <div className="min-w-0 flex-1">
@@ -253,7 +396,12 @@ function LoginPrompt() {
   return (
     <div className="rounded-2xl border border-border bg-card p-8 text-center">
       <p className="mb-4">Sign in to manage friends.</p>
-      <Link to="/auth" className="inline-block rounded-md bg-primary px-4 py-2 font-bold text-primary-foreground">Sign in</Link>
+      <Link
+        to="/auth"
+        className="inline-block rounded-md bg-primary px-4 py-2 font-bold text-primary-foreground"
+      >
+        Sign in
+      </Link>
     </div>
   );
 }
