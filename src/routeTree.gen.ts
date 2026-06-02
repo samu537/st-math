@@ -14,6 +14,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlayGameIdRouteImport } from './routes/play.$gameId'
+import { Route as ApiPublicProxyRouteImport } from './routes/api/public/proxy'
 
 const FriendsRoute = FriendsRouteImport.update({
   id: '/friends',
@@ -40,6 +41,11 @@ const PlayGameIdRoute = PlayGameIdRouteImport.update({
   path: '/play/$gameId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicProxyRoute = ApiPublicProxyRouteImport.update({
+  id: '/api/public/proxy',
+  path: '/api/public/proxy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -47,6 +53,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/friends': typeof FriendsRoute
   '/play/$gameId': typeof PlayGameIdRoute
+  '/api/public/proxy': typeof ApiPublicProxyRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -54,6 +61,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/friends': typeof FriendsRoute
   '/play/$gameId': typeof PlayGameIdRoute
+  '/api/public/proxy': typeof ApiPublicProxyRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,13 +70,33 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/friends': typeof FriendsRoute
   '/play/$gameId': typeof PlayGameIdRoute
+  '/api/public/proxy': typeof ApiPublicProxyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/auth' | '/friends' | '/play/$gameId'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/auth'
+    | '/friends'
+    | '/play/$gameId'
+    | '/api/public/proxy'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/auth' | '/friends' | '/play/$gameId'
-  id: '__root__' | '/' | '/admin' | '/auth' | '/friends' | '/play/$gameId'
+  to:
+    | '/'
+    | '/admin'
+    | '/auth'
+    | '/friends'
+    | '/play/$gameId'
+    | '/api/public/proxy'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/auth'
+    | '/friends'
+    | '/play/$gameId'
+    | '/api/public/proxy'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -77,6 +105,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   FriendsRoute: typeof FriendsRoute
   PlayGameIdRoute: typeof PlayGameIdRoute
+  ApiPublicProxyRoute: typeof ApiPublicProxyRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -116,6 +145,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlayGameIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/proxy': {
+      id: '/api/public/proxy'
+      path: '/api/public/proxy'
+      fullPath: '/api/public/proxy'
+      preLoaderRoute: typeof ApiPublicProxyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -125,6 +161,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   FriendsRoute: FriendsRoute,
   PlayGameIdRoute: PlayGameIdRoute,
+  ApiPublicProxyRoute: ApiPublicProxyRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
