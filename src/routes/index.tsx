@@ -37,6 +37,15 @@ function Index() {
             <p className="mt-6 max-w-xl text-lg text-muted-foreground">
               Bite-sized HTML5 games, hand-picked and ready to play in your browser. One click to launch, one tap to go fullscreen.
             </p>
+            <div className="mt-8">
+              <a
+                href="/samu-hub.html"
+                download="samu-hub.html"
+                className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-br from-primary to-ember px-5 py-3 text-sm font-bold text-primary-foreground shadow-[0_10px_30px_-10px_var(--color-primary)] transition hover:scale-[1.03]"
+              >
+                ⬇ Download single-file site
+              </a>
+            </div>
           </div>
         </div>
       </section>
